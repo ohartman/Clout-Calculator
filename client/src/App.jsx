@@ -183,16 +183,18 @@ function App() {
           <div className="tracks-list">
             <h3>Track Breakdown</h3>
             <div className="notice">
-              ⚠️ Note: Historical data integration is in progress. Current scores are based on artist popularity.
+              ✨ Scores are inflation-adjusted to account for Spotify's platform growth (~17% annually)
             </div>
             <table>
               <thead>
                 <tr>
                   <th>Track</th>
                   <th>Artist</th>
-                  <th>Added Date</th>
-                  <th>Current Followers</th>
-                  <th>Popularity</th>
+                  <th>Discovery Tier</th>
+                  <th>Added</th>
+                  <th>Followers Then</th>
+                  <th>Followers Now</th>
+                  <th>Real Growth</th>
                   <th>Clout Score</th>
                 </tr>
               </thead>
@@ -201,9 +203,17 @@ function App() {
                   <tr key={index}>
                     <td>{track.trackName}</td>
                     <td>{track.artistName}</td>
-                    <td>{new Date(track.addedAt).toLocaleDateString()}</td>
+                    <td>
+                      <span className={`discovery-tier tier-${track.discoveryTier?.toLowerCase().replace(/\s/g, '-')}`}>
+                        {track.discoveryTier || 'N/A'}
+                      </span>
+                    </td>
+                    <td>{track.addedAgo || 'N/A'}</td>
+                    <td>{track.followersWhenAdded?.toLocaleString() || 'N/A'}</td>
                     <td>{track.currentFollowers.toLocaleString()}</td>
-                    <td>{track.popularity}/100</td>
+                    <td className={track.inflationAdjustedGrowth > 0 ? 'positive-growth' : 'negative-growth'}>
+                      {track.inflationAdjustedGrowth > 0 ? '+' : ''}{track.inflationAdjustedGrowth}%
+                    </td>
                     <td className="clout-score">{track.cloutScore}</td>
                   </tr>
                 ))}

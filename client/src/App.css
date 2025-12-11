@@ -296,6 +296,57 @@ tbody tr:hover {
   font-size: 1.1rem;
 }
 
+.discovery-tier {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tier-underground-legend {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: #000;
+}
+
+.tier-early-adopter {
+  background: linear-gradient(135deg, #9B59B6, #8E44AD);
+  color: #fff;
+}
+
+.tier-ahead-of-curve {
+  background: linear-gradient(135deg, #3498DB, #2980B9);
+  color: #fff;
+}
+
+.tier-rising-star-hunter {
+  background: linear-gradient(135deg, #1ABC9C, #16A085);
+  color: #fff;
+}
+
+.tier-trending-finder {
+  background: linear-gradient(135deg, #95A5A6, #7F8C8D);
+  color: #fff;
+}
+
+.tier-mainstream {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.positive-growth {
+  color: #1db954;
+  font-weight: 600;
+}
+
+.negative-growth {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .app {
     padding: 1rem;

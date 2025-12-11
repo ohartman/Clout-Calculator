@@ -224,13 +224,14 @@ app.post('/api/calculate-clout', async (req, res) => {
 
   try {
     const token = await getSpotifyToken();
+    const scraper = require('./artistToolsScraper');
     const cloutData = [];
 
     for (const track of tracks) {
       if (!track.track || !track.track.artists) continue;
 
       const artist = track.track.artists[0];
-      const addedAt = track.added_at;
+      const addedAt = new Date(track.added_at);
 
       // Get current artist data
       const artistResponse = await axios.get(`https://api.spotify.com/v1/artists/${artist.id}`, {
@@ -239,21 +240,35 @@ app.post('/api/calculate-clout', async (req, res) => {
         }
       });
 
-      // For now, we'll calculate a basic score without historical data
-      // This will be enhanced once we integrate artist.tools
       const currentFollowers = artistResponse.data.followers.total;
       const popularity = artistResponse.data.popularity;
+
+      // Estimate what monthly listeners were when track was added
+      // Note: Using followers as proxy for monthly listeners
+      // In reality, monthly listeners ≈ followers * 2-5x depending on artist
+      const estimatedListenersWhenAdded = scraper.estimateListenersAtDate(currentFollowers, addedAt);
+      
+      // Calculate inflation-adjusted clout score
+      const cloutMetrics = scraper.calculateCloutScore(
+        estimatedListenersWhenAdded,
+        currentFollowers,
+        addedAt
+      );
 
       cloutData.push({
         trackName: track.track.name,
         artistName: artist.name,
         artistId: artist.id,
-        addedAt,
+        addedAt: track.added_at,
+        addedAgo: Math.floor((Date.now() - addedAt) / (1000 * 60 * 60 * 24 / 30)) + ' months ago',
         currentFollowers,
+        followersWhenAdded: estimatedListenersWhenAdded,
         popularity,
-        // Placeholder for historical comparison
-        estimatedGrowth: 'Historical data needed',
-        cloutScore: popularity // Temporary score based on popularity
+        rawGrowth: Math.round(cloutMetrics.rawGrowth),
+        inflationAdjustedGrowth: cloutMetrics.inflationAdjustedGrowth,
+        discoveryTier: cloutMetrics.discoveryTier,
+        earlyDiscoveryBonus: cloutMetrics.earlyDiscoveryMultiplier,
+        cloutScore: cloutMetrics.score
       });
     }
 
@@ -261,12 +276,16 @@ app.post('/api/calculate-clout', async (req, res) => {
     const totalClout = cloutData.reduce((sum, item) => sum + item.cloutScore, 0);
     const averageClout = totalClout / cloutData.length;
 
+    // Sort by clout score (highest first)
+    cloutData.sort((a, b) => b.cloutScore - a.cloutScore);
+
     res.json({
       playlistId,
-      totalClout,
-      averageClout,
+      totalClout: Math.round(totalClout),
+      averageClout: Math.round(averageClout),
       trackCount: cloutData.length,
-      tracks: cloutData
+      tracks: cloutData,
+      note: 'Scores are inflation-adjusted to account for Spotify platform growth'
     });
   } catch (error) {
     console.error('Error calculating clout:', error.response?.data || error.message);
