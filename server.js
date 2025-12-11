@@ -297,14 +297,27 @@ app.post('/api/calculate-clout', async (req, res) => {
 
 // Serve React app for all other routes in production
 if (process.env.NODE_ENV === 'production') {
-  app.use((req, res) => {
-    res.sendFile(path.join(__dirname, 'client/dist/index.html'));
+  const distPath = path.join(__dirname, 'client/dist/index.html');
+  console.log(`📂 Looking for index.html at: ${distPath}`);
+  
+  app.use((req, res, next) => {
+    // Don't catch API routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/login') || req.path.startsWith('/callback')) {
+      return next();
+    }
+    
+    res.sendFile(distPath, (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        res.status(500).send('Failed to load application');
+      }
+    });
   });
 }
 
 app.listen(PORT, () => {
-  console.log(`🎵 Clout Calculator API running on http://localhost:${PORT}`);
-  console.log(`📊 Make sure to set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in .env`);
+  console.log(`🎵 Clout Calculator API running on port ${PORT}`);
+  console.log(`📊 Environment variables loaded: ${!!process.env.SPOTIFY_CLIENT_ID}`);
   if (process.env.NODE_ENV === 'production') {
     console.log(`🚀 Serving production build from /client/dist`);
   }
