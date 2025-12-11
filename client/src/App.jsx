@@ -185,6 +185,9 @@ function App() {
             <div className="notice">
               ✨ Scores are inflation-adjusted to account for Spotify's platform growth (~17% annually)
             </div>
+            <div className="scroll-hint">
+              👉 Swipe left to see all columns →
+            </div>
             <table>
               <thead>
                 <tr>
