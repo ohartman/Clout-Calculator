@@ -207,7 +207,7 @@ function App() {
                     <td>{track.trackName}</td>
                     <td>{track.artistName}</td>
                     <td>
-                      <span className={`discovery-tier tier-${track.discoveryTier?.toLowerCase().replace(/\s/g, '-')}`}>
+                      <span className={`discovery-tier ${track.discoveryTier ? 'tier-' + track.discoveryTier.toLowerCase().replace(/\s/g, '-') : 'tier-mainstream'}`}>
                         {track.discoveryTier || 'N/A'}
                       </span>
                     </td>
