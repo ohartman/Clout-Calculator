@@ -167,15 +167,15 @@ function App() {
             <div className="score-container">
               <div className="score-card">
                 <h3>Total Clout Score</h3>
-                <div className="score-value">{cloutResults.totalClout.toFixed(0)}</div>
+                <div className="score-value">{cloutResults.totalClout?.toFixed(0) || 0}</div>
               </div>
               <div className="score-card">
                 <h3>Average Clout</h3>
-                <div className="score-value">{cloutResults.averageClout.toFixed(1)}</div>
+                <div className="score-value">{cloutResults.averageClout?.toFixed(1) || 0}</div>
               </div>
               <div className="score-card">
                 <h3>Tracks Analyzed</h3>
-                <div className="score-value">{cloutResults.trackCount}</div>
+                <div className="score-value">{cloutResults.trackCount || 0}</div>
               </div>
             </div>
           </div>
@@ -188,6 +188,7 @@ function App() {
             <div className="scroll-hint">
               👉 Swipe left to see all columns →
             </div>
+            {cloutResults.tracks && cloutResults.tracks.length > 0 ? (
             <table>
               <thead>
                 <tr>
@@ -204,8 +205,8 @@ function App() {
               <tbody>
                 {cloutResults.tracks.map((track, index) => (
                   <tr key={index}>
-                    <td>{track.trackName}</td>
-                    <td>{track.artistName}</td>
+                    <td>{track.trackName || 'Unknown'}</td>
+                    <td>{track.artistName || 'Unknown'}</td>
                     <td>
                       <span className={`discovery-tier ${track.discoveryTier ? 'tier-' + track.discoveryTier.toLowerCase().replace(/\s/g, '-') : 'tier-mainstream'}`}>
                         {track.discoveryTier || 'N/A'}
@@ -213,15 +214,18 @@ function App() {
                     </td>
                     <td>{track.addedAgo || 'N/A'}</td>
                     <td>{track.followersWhenAdded?.toLocaleString() || 'N/A'}</td>
-                    <td>{track.currentFollowers.toLocaleString()}</td>
+                    <td>{track.currentFollowers?.toLocaleString() || 'N/A'}</td>
                     <td className={track.inflationAdjustedGrowth > 0 ? 'positive-growth' : 'negative-growth'}>
-                      {track.inflationAdjustedGrowth > 0 ? '+' : ''}{track.inflationAdjustedGrowth}%
+                      {track.inflationAdjustedGrowth > 0 ? '+' : ''}{track.inflationAdjustedGrowth || 0}%
                     </td>
-                    <td className="clout-score">{track.cloutScore}</td>
+                    <td className="clout-score">{track.cloutScore || 0}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            ) : (
+              <div className="notice">No tracks found in this playlist.</div>
+            )}
           </div>
         </div>
       )}
