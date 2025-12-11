@@ -51,11 +51,18 @@ function App() {
       });
       setPlaylists(response.data.items);
     } catch (err) {
-      setError('Failed to fetch playlists');
-      console.error(err);
+      console.error('Playlist fetch error:', err);
+      
       if (err.response?.status === 401) {
+        setError('Session expired. Please log in again.');
         localStorage.removeItem('spotify_token');
         setAccessToken(null);
+      } else if (err.response?.status === 429) {
+        setError('Too many requests. Please wait a moment and try again.');
+      } else if (!navigator.onLine) {
+        setError('No internet connection. Please check your network.');
+      } else {
+        setError('Failed to fetch playlists. Please try refreshing the page.');
       }
     } finally {
       setLoading(false);
