@@ -122,16 +122,22 @@ app.get('/api/playlists', async (req, res) => {
   }
 
   try {
-    const response = await axios.get('https://api.spotify.com/v1/me/playlists', {
-      headers: {
-        'Authorization': `Bearer ${userToken}`
-      },
-      params: {
-        limit: 50
-      }
-    });
+    let allPlaylists = [];
+    let url = 'https://api.spotify.com/v1/me/playlists?limit=50';
 
-    res.json(response.data);
+    // Paginate through all playlists
+    while (url) {
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${userToken}`
+        }
+      });
+
+      allPlaylists = allPlaylists.concat(response.data.items);
+      url = response.data.next; // Next page URL, or null if done
+    }
+
+    res.json({ items: allPlaylists });
   } catch (error) {
     console.error('Error fetching playlists:', error.response?.data || error.message);
     res.status(500).json({ error: 'Failed to fetch playlists' });
