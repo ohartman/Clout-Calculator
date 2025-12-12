@@ -79,9 +79,12 @@ function App() {
       setSelectedPlaylist({ name: response.data.playlistName });
     } catch (err) {
       console.error('Analysis error:', err);
+      console.error('Error response status:', err.response?.status);
+      console.error('Error response data:', err.response?.data);
       
       // Check for Spotify timeout error (503 status or SPOTIFY_TIMEOUT error)
       if (err.response?.status === 503 || err.response?.data?.error === 'SPOTIFY_TIMEOUT') {
+        console.log('DETECTED TIMEOUT ERROR');
         setSpotifyTimeout(err.response.data);
         setError(err.response.data.message);
       } else if (err.response?.data?.error === 'PROCESSING') {
@@ -118,7 +121,11 @@ function App() {
             <h3>Spotify Timeout</h3>
             <p>
               Spotify has put us in timeout due to high traffic. 
-              We'll be back in approximately <strong>{spotifyTimeout.hoursRemaining} hour{spotifyTimeout.hoursRemaining !== 1 ? 's' : ''}</strong>.
+              {spotifyTimeout.hoursRemaining ? (
+                <> We'll be back in approximately <strong>{spotifyTimeout.hoursRemaining} hour{spotifyTimeout.hoursRemaining !== 1 ? 's' : ''}</strong>.</>
+              ) : (
+                <> Please try again later.</>
+              )}
             </p>
             <p style={{fontSize: '0.85rem', opacity: 0.8, marginTop: '0.5rem'}}>
               Sorry for the inconvenience! This happens when too many people use the app at once.
