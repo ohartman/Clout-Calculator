@@ -319,7 +319,8 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
   try {
     // Use client credentials - should work for public playlists
     const token = await getSpotifyToken();
-    console.log('Got Spotify token, fetching playlist...');
+    console.log('Got Spotify token:', token ? 'Token received (length: ' + token.length + ')' : 'NO TOKEN');
+    console.log('Fetching playlist:', playlistId);
     
     // Try accessing playlist with client credentials
     // Some playlists work, some don't - depends on privacy settings
@@ -330,6 +331,13 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
         'Authorization': `Bearer ${token}`
       }
     }).catch(err => {
+      console.error('Spotify API Error Details:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        headers: err.response?.headers
+      });
+      
       // If 404, playlist might be private or require user auth
       if (err.response?.status === 404) {
         throw new Error('PRIVATE_PLAYLIST');
