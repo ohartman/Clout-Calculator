@@ -64,8 +64,8 @@ async function getCachedArtist(artistId, token) {
   
   while (retries < maxRetries) {
     try {
-      // Add delay between requests to avoid rate limits (50ms)
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Add delay between requests to avoid rate limits (100ms)
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       const response = await axios.get(`https://api.spotify.com/v1/artists/${artistId}`, {
         headers: {
@@ -83,10 +83,18 @@ async function getCachedArtist(artistId, token) {
       return response.data;
     } catch (error) {
       if (error.response?.status === 429) {
-        // Rate limited - wait and retry
-        const retryAfter = parseInt(error.response.headers['retry-after'] || '2') * 1000;
-        console.log(`⚠️  Rate limited, waiting ${retryAfter}ms before retry ${retries + 1}/${maxRetries}`);
-        await new Promise(resolve => setTimeout(resolve, retryAfter));
+        // Rate limited - cap wait time at 5 seconds max
+        const retryAfter = parseInt(error.response.headers['retry-after'] || '2');
+        const waitTime = Math.min(retryAfter * 1000, 5000); // Cap at 5 seconds
+        
+        console.log(`⚠️  Rate limited for artist ${artistId}, waiting ${waitTime}ms before retry ${retries + 1}/${maxRetries}`);
+        
+        if (waitTime > 5000) {
+          console.error(`❌ Rate limit too severe (${retryAfter}s requested), aborting`);
+          throw new Error(`Rate limit exceeded - try again later`);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         retries++;
       } else {
         throw error;
