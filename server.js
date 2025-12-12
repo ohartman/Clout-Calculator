@@ -384,6 +384,8 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
         rawGrowth: Math.round(cloutMetrics.rawGrowth),
         inflationAdjustedGrowth: cloutMetrics.inflationAdjustedGrowth,
         discoveryTier: cloutMetrics.discoveryTier,
+        tierEmoji: cloutMetrics.tierEmoji,
+        tierColor: cloutMetrics.tierColor,
         earlyDiscoveryBonus: cloutMetrics.earlyDiscoveryMultiplier,
         cloutScore: cloutMetrics.score
       });

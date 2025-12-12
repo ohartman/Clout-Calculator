@@ -154,8 +154,15 @@ function App() {
                     <td>{track.trackName || 'Unknown'}</td>
                     <td>{track.artistName || 'Unknown'}</td>
                     <td>
-                      <span className={`discovery-tier ${track.discoveryTier ? 'tier-' + track.discoveryTier.toLowerCase().replace(/\s/g, '-') : 'tier-mainstream'}`}>
-                        {track.discoveryTier || 'N/A'}
+                      <span 
+                        className="discovery-tier" 
+                        style={{ 
+                          background: `linear-gradient(135deg, ${track.tierColor}22, ${track.tierColor}44)`,
+                          border: `1px solid ${track.tierColor}66`,
+                          color: track.tierColor
+                        }}
+                      >
+                        {track.tierEmoji} {track.discoveryTier || 'N/A'}
                       </span>
                     </td>
                     <td>{track.addedAgo || 'N/A'}</td>

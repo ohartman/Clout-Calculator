@@ -155,25 +155,67 @@ class ArtistToolsScraper {
       addedDate
     );
     
-    // Early discovery bonus: smaller artists get more points
+    // Enhanced discovery tier system with more granular levels
     let earlyDiscoveryMultiplier = 1;
     let discoveryTier = 'Mainstream';
+    let tierEmoji = '📻';
+    let tierColor = '#95A5A6';
     
-    if (listenerAtAdd < 1000) {
-      earlyDiscoveryMultiplier = 10;
+    if (listenerAtAdd < 100) {
+      earlyDiscoveryMultiplier = 20;
+      discoveryTier = 'Bedroom Producer';
+      tierEmoji = '🎧';
+      tierColor = '#FF10F0';
+    } else if (listenerAtAdd < 500) {
+      earlyDiscoveryMultiplier = 15;
+      discoveryTier = 'Soundcloud Rapper';
+      tierEmoji = '☁️';
+      tierColor = '#FF6B35';
+    } else if (listenerAtAdd < 1000) {
+      earlyDiscoveryMultiplier = 12;
       discoveryTier = 'Underground Legend';
+      tierEmoji = '🔥';
+      tierColor = '#FFD700';
+    } else if (listenerAtAdd < 5000) {
+      earlyDiscoveryMultiplier = 8;
+      discoveryTier = 'Local Hero';
+      tierEmoji = '⭐';
+      tierColor = '#FFA500';
     } else if (listenerAtAdd < 10000) {
-      earlyDiscoveryMultiplier = 5;
+      earlyDiscoveryMultiplier = 6;
       discoveryTier = 'Early Adopter';
+      tierEmoji = '🎯';
+      tierColor = '#9B59B6';
+    } else if (listenerAtAdd < 50000) {
+      earlyDiscoveryMultiplier = 4;
+      discoveryTier = 'Tastemaker';
+      tierEmoji = '💎';
+      tierColor = '#3498DB';
     } else if (listenerAtAdd < 100000) {
       earlyDiscoveryMultiplier = 3;
       discoveryTier = 'Ahead of Curve';
+      tierEmoji = '🌊';
+      tierColor = '#1ABC9C';
+    } else if (listenerAtAdd < 500000) {
+      earlyDiscoveryMultiplier = 2.5;
+      discoveryTier = 'Indie Enthusiast';
+      tierEmoji = '🎸';
+      tierColor = '#16A085';
     } else if (listenerAtAdd < 1000000) {
       earlyDiscoveryMultiplier = 2;
       discoveryTier = 'Rising Star Hunter';
-    } else if (listenerAtAdd < 10000000) {
+      tierEmoji = '🌟';
+      tierColor = '#27AE60';
+    } else if (listenerAtAdd < 5000000) {
       earlyDiscoveryMultiplier = 1.5;
       discoveryTier = 'Trending Finder';
+      tierEmoji = '📈';
+      tierColor = '#2ECC71';
+    } else if (listenerAtAdd < 10000000) {
+      earlyDiscoveryMultiplier = 1.2;
+      discoveryTier = 'Popular Follower';
+      tierEmoji = '🎵';
+      tierColor = '#BDC3C7';
     }
     
     // Base score is inflation-adjusted growth percentage
@@ -188,6 +230,8 @@ class ArtistToolsScraper {
       rawGrowth: this.calculateGrowth(currentListeners, listenerAtAdd),
       earlyDiscoveryMultiplier,
       discoveryTier,
+      tierEmoji,
+      tierColor,
       listenersAtDiscovery: listenerAtAdd
     };
   }
