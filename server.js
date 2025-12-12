@@ -31,6 +31,16 @@ const processingQueue = [];
 let spotifyInTimeout = false;
 let timeoutUntil = null;
 
+// TEMPORARY: Keep timeout active until Spotify's actual rate limit expires
+// We know we're rate limited for ~24 hours starting Dec 12, 2025 ~4:30 PM EST
+// Remove this line after Dec 13, 2025 6:00 PM EST
+const rateLimitExpires = new Date('2025-12-13T18:00:00-05:00').getTime();
+if (Date.now() < rateLimitExpires) {
+  spotifyInTimeout = true;
+  timeoutUntil = rateLimitExpires;
+  console.log(`🚫 Known rate limit active until ${new Date(rateLimitExpires).toISOString()}`);
+}
+
 // Check if Spotify has us in timeout
 function isSpotifyInTimeout() {
   if (!spotifyInTimeout) return false;
@@ -784,6 +794,16 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
     console.log(`✅ Successfully analyzed ${cloutData.length} out of ${allTracks.length} tracks`);
 
     if (cloutData.length === 0) {
+      // Check if we failed due to timeout
+      if (isSpotifyInTimeout()) {
+        const hoursRemaining = Math.ceil((timeoutUntil - Date.now()) / (1000 * 60 * 60));
+        return res.status(503).json({ 
+          error: 'SPOTIFY_TIMEOUT',
+          message: `Spotify has put us in timeout due to high traffic. Please try again in ${hoursRemaining} hour(s).`,
+          timeoutUntil: new Date(timeoutUntil).toISOString()
+        });
+      }
+      
       return res.status(400).json({ 
         error: 'No valid tracks found in playlist. Playlist may contain only podcasts or local files.' 
       });
