@@ -310,6 +310,8 @@ app.post('/api/calculate-clout', async (req, res) => {
 app.post('/api/analyze-public-playlist', async (req, res) => {
   const { playlistId } = req.body;
 
+  console.log('Received playlist analysis request for:', playlistId);
+
   if (!playlistId) {
     return res.status(400).json({ error: 'Playlist ID is required' });
   }
@@ -317,6 +319,7 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
   try {
     // Use server's Spotify token (client credentials)
     const token = await getSpotifyToken();
+    console.log('Got Spotify token, fetching playlist...');
     
     // Get playlist info
     const playlistResponse = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
@@ -324,6 +327,8 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
         'Authorization': `Bearer ${token}`
       }
     });
+
+    console.log('Playlist found:', playlistResponse.data.name);
 
     const playlistName = playlistResponse.data.name;
     
