@@ -230,12 +230,29 @@ class ArtistToolsScraper {
     // NO FLOOR - negative growth results in negative scores
     const percentageScore = inflationAdjustedGrowth;
     
+    // OPTION 4: Cap multiplier if artist didn't "make it big"
+    // Artists who end up small don't get the full early discovery bonus
+    let cappedMultiplier = earlyDiscoveryMultiplier;
+    if (currentListeners < 10000) {
+      cappedMultiplier = Math.min(earlyDiscoveryMultiplier, 2); // Max 2x for artists under 10K
+    } else if (currentListeners < 50000) {
+      cappedMultiplier = Math.min(earlyDiscoveryMultiplier, 4); // Max 4x for artists under 50K
+    } else if (currentListeners < 100000) {
+      cappedMultiplier = Math.min(earlyDiscoveryMultiplier, 6); // Max 6x for artists under 100K
+    }
+    // Artists over 100K get full multiplier
+    
     // Combined score: percentage growth × early discovery multiplier × volume weight
     // Negative growth will result in negative scores (bad picks hurt you!)
-    const baseScore = percentageScore * volumeWeight;
+    const baseScore = percentageScore * volumeWeight * cappedMultiplier;
     
-    // Apply early discovery multiplier
-    const finalScore = baseScore * earlyDiscoveryMultiplier;
+    // OPTION 3: Relevance factor based on final artist size
+    // Only artists who became relevant contribute meaningfully
+    // Scale: 10M followers = 1.0, 1M = 0.86, 100K = 0.71, 10K = 0.57
+    const relevanceFactor = Math.min(Math.log10(Math.max(currentListeners, 1)) / 7, 1);
+    
+    // Apply relevance multiplier
+    const finalScore = baseScore * relevanceFactor;
     
     return {
       score: Math.round(finalScore),
@@ -244,6 +261,8 @@ class ArtistToolsScraper {
       absoluteGrowth: absoluteGrowth,
       volumeWeight: Math.round(volumeWeight * 100) / 100,
       earlyDiscoveryMultiplier,
+      cappedMultiplier: Math.round(cappedMultiplier * 10) / 10,
+      relevanceFactor: Math.round(relevanceFactor * 100) / 100,
       discoveryTier,
       tierEmoji,
       tierColor,
