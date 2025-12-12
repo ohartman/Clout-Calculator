@@ -638,43 +638,72 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
     const cloutData = [];
 
     for (const track of allTracks) {
-      if (!track.track || !track.track.artists) continue;
+      // Skip tracks with missing data
+      if (!track.track) {
+        console.log('⚠️  Skipping track: no track data');
+        continue;
+      }
+      
+      if (!track.track.artists || track.track.artists.length === 0) {
+        console.log('⚠️  Skipping track:', track.track.name, '- no artists');
+        continue;
+      }
 
       const artist = track.track.artists[0];
+      
+      if (!artist.id) {
+        console.log('⚠️  Skipping track:', track.track.name, '- artist has no ID');
+        continue;
+      }
+      
       const addedAt = new Date(track.added_at);
 
-      // Get current artist data with caching and retry logic (using client credentials)
-      const artistData = await getCachedArtist(artist.id, clientToken);
+      try {
+        // Get current artist data with caching and retry logic (using client credentials)
+        const artistData = await getCachedArtist(artist.id, clientToken);
 
-      const currentFollowers = artistData.followers.total;
-      const popularity = artistData.popularity;
+        const currentFollowers = artistData.followers.total;
+        const popularity = artistData.popularity;
 
-      // Estimate listeners when track was added
-      const estimatedListenersWhenAdded = scraper.estimateListenersAtDate(currentFollowers, addedAt);
-      
-      // Calculate inflation-adjusted clout score
-      const cloutMetrics = scraper.calculateCloutScore(
-        estimatedListenersWhenAdded,
-        currentFollowers,
-        addedAt
-      );
+        // Estimate listeners when track was added
+        const estimatedListenersWhenAdded = scraper.estimateListenersAtDate(currentFollowers, addedAt);
+        
+        // Calculate inflation-adjusted clout score
+        const cloutMetrics = scraper.calculateCloutScore(
+          estimatedListenersWhenAdded,
+          currentFollowers,
+          addedAt
+        );
 
-      cloutData.push({
-        trackName: track.track.name || 'Unknown',
-        artistName: artist.name || 'Unknown',
-        artistId: artist.id,
-        addedAt: track.added_at,
-        addedAgo: Math.floor((Date.now() - addedAt) / (1000 * 60 * 60 * 24 / 30)) + ' months ago',
-        currentFollowers,
-        followersWhenAdded: estimatedListenersWhenAdded,
-        popularity,
-        rawGrowth: Math.round(cloutMetrics.rawGrowth),
-        inflationAdjustedGrowth: cloutMetrics.inflationAdjustedGrowth,
-        discoveryTier: cloutMetrics.discoveryTier,
-        tierEmoji: cloutMetrics.tierEmoji,
-        tierColor: cloutMetrics.tierColor,
-        earlyDiscoveryBonus: cloutMetrics.earlyDiscoveryMultiplier,
-        cloutScore: cloutMetrics.score
+        cloutData.push({
+          trackName: track.track.name || 'Unknown',
+          artistName: artist.name || 'Unknown',
+          artistId: artist.id,
+          addedAt: track.added_at,
+          addedAgo: Math.floor((Date.now() - addedAt) / (1000 * 60 * 60 * 24 / 30)) + ' months ago',
+          currentFollowers,
+          followersWhenAdded: estimatedListenersWhenAdded,
+          popularity,
+          rawGrowth: Math.round(cloutMetrics.rawGrowth),
+          inflationAdjustedGrowth: cloutMetrics.inflationAdjustedGrowth,
+          discoveryTier: cloutMetrics.discoveryTier,
+          tierEmoji: cloutMetrics.tierEmoji,
+          tierColor: cloutMetrics.tierColor,
+          earlyDiscoveryBonus: cloutMetrics.earlyDiscoveryMultiplier,
+          cloutScore: cloutMetrics.score
+        });
+      } catch (error) {
+        console.error('❌ Error processing track:', track.track?.name || 'Unknown', '-', error.message);
+        // Skip this track and continue with the rest
+        continue;
+      }
+    }
+
+    console.log(`✅ Successfully analyzed ${cloutData.length} out of ${allTracks.length} tracks`);
+
+    if (cloutData.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid tracks found in playlist. Playlist may contain only podcasts or local files.' 
       });
     }
 
