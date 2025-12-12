@@ -23,6 +23,33 @@ const requestCounts = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_MINUTE = 10; // Max 10 playlist analyses per minute per IP
 
+// Global processing queue - only one playlist at a time
+let isProcessing = false;
+const processingQueue = [];
+
+// Spotify timeout tracking (when we hit severe rate limits)
+let spotifyInTimeout = false;
+let timeoutUntil = null;
+
+// Check if Spotify has us in timeout
+function isSpotifyInTimeout() {
+  if (!spotifyInTimeout) return false;
+  if (timeoutUntil && Date.now() > timeoutUntil) {
+    spotifyInTimeout = false;
+    timeoutUntil = null;
+    console.log('✅ Spotify timeout period expired');
+    return false;
+  }
+  return true;
+}
+
+// Set Spotify timeout (triggered by severe rate limiting)
+function setSpotifyTimeout(hours = 24) {
+  spotifyInTimeout = true;
+  timeoutUntil = Date.now() + (hours * 60 * 60 * 1000);
+  console.log(`🚫 Spotify timeout activated until ${new Date(timeoutUntil).toISOString()}`);
+}
+
 // Helper function to check rate limit
 function checkRateLimit(ip) {
   const now = Date.now();
@@ -87,6 +114,13 @@ async function getCachedArtist(artistId, token) {
         const retryAfter = parseInt(error.response.headers['retry-after'] || '2');
         const waitTime = Math.min(retryAfter * 1000, 5000); // Cap at 5 seconds
         
+        // If Spotify wants us to wait more than 1 hour, activate timeout mode
+        if (retryAfter > 3600) {
+          console.error(`🚫 Severe rate limit detected (${retryAfter}s = ${Math.round(retryAfter/3600)} hours)`);
+          setSpotifyTimeout(24); // Set 24 hour timeout
+          throw new Error(`SPOTIFY_TIMEOUT`);
+        }
+        
         console.log(`⚠️  Rate limited for artist ${artistId}, waiting ${waitTime}ms before retry ${retries + 1}/${maxRetries}`);
         
         if (waitTime > 5000) {
@@ -125,6 +159,23 @@ setInterval(() => {
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Timeout status endpoint - check if Spotify has us rate limited
+app.get('/api/timeout-status', (req, res) => {
+  if (isSpotifyInTimeout()) {
+    res.json({
+      inTimeout: true,
+      message: 'Spotify has put us in timeout due to high traffic',
+      timeoutUntil: new Date(timeoutUntil).toISOString(),
+      hoursRemaining: Math.ceil((timeoutUntil - Date.now()) / (1000 * 60 * 60))
+    });
+  } else {
+    res.json({
+      inTimeout: false,
+      message: 'Service is operational'
+    });
+  }
 });
 
 // Serve static files from the React build in production
@@ -574,6 +625,26 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
 
   console.log('Received playlist analysis request for:', playlistId, 'from IP:', userIP);
 
+  // Check if Spotify has us in timeout
+  if (isSpotifyInTimeout()) {
+    const hoursRemaining = Math.ceil((timeoutUntil - Date.now()) / (1000 * 60 * 60));
+    console.log(`🚫 Request rejected - in Spotify timeout (${hoursRemaining}h remaining)`);
+    return res.status(503).json({ 
+      error: 'SPOTIFY_TIMEOUT',
+      message: `Spotify has put us in timeout due to high traffic. Please try again in ${hoursRemaining} hour(s).`,
+      timeoutUntil: new Date(timeoutUntil).toISOString()
+    });
+  }
+
+  // Check if already processing (queue)
+  if (isProcessing) {
+    console.log(`⏳ Request queued - already processing another playlist`);
+    return res.status(429).json({ 
+      error: 'PROCESSING',
+      message: 'Another playlist is currently being analyzed. Please try again in a moment.'
+    });
+  }
+
   // Check rate limit
   if (!checkRateLimit(userIP)) {
     console.log(`⛔ Rate limit exceeded for IP: ${userIP}`);
@@ -585,6 +656,9 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
   if (!playlistId) {
     return res.status(400).json({ error: 'Playlist ID is required' });
   }
+
+  // Mark as processing
+  isProcessing = true;
 
   try {
     // Use Owen's user token for playlist access (playlists require user auth)
@@ -740,6 +814,16 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
   } catch (error) {
     console.error('Error analyzing playlist:', error.message);
     
+    // Check for Spotify timeout error
+    if (error.message === 'SPOTIFY_TIMEOUT') {
+      const hoursRemaining = Math.ceil((timeoutUntil - Date.now()) / (1000 * 60 * 60));
+      return res.status(503).json({ 
+        error: 'SPOTIFY_TIMEOUT',
+        message: `Spotify has put us in timeout due to high traffic. Please try again in ${hoursRemaining} hour(s).`,
+        timeoutUntil: new Date(timeoutUntil).toISOString()
+      });
+    }
+    
     if (error.message === 'PRIVATE_PLAYLIST') {
       return res.status(404).json({ 
         error: 'This playlist is private or requires authentication. Please make sure the playlist is public.' 
@@ -755,6 +839,10 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
     }
     
     res.status(500).json({ error: 'Failed to analyze playlist' });
+  } finally {
+    // Always release the processing lock
+    isProcessing = false;
+    console.log('🔓 Processing lock released');
   }
 });
 

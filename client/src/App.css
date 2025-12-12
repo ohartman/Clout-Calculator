@@ -282,6 +282,41 @@ h1 {
   margin-bottom: 1rem;
 }
 
+.timeout-banner {
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 152, 0, 0.15));
+  border: 2px solid rgba(255, 193, 7, 0.5);
+  border-radius: 15px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  animation: slideDown 0.6s ease;
+  backdrop-filter: blur(10px);
+}
+
+.timeout-icon {
+  font-size: 3rem;
+  animation: pulse 2s ease infinite;
+}
+
+.timeout-content h3 {
+  margin: 0 0 0.5rem 0;
+  color: #ffc107;
+  font-size: 1.3rem;
+}
+
+.timeout-content p {
+  margin: 0;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
 .loading {
   text-align: center;
   padding: 3rem;

@@ -9,6 +9,22 @@ function App() {
   const [cloutResults, setCloutResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [spotifyTimeout, setSpotifyTimeout] = useState(null);
+
+  // Check timeout status on mount
+  useEffect(() => {
+    const checkTimeout = async () => {
+      try {
+        const response = await axios.get('/api/timeout-status');
+        if (response.data.inTimeout) {
+          setSpotifyTimeout(response.data);
+        }
+      } catch (err) {
+        console.error('Error checking timeout status:', err);
+      }
+    };
+    checkTimeout();
+  }, []);
 
   const extractPlaylistId = (url) => {
     // Extract playlist ID from Spotify URL
@@ -43,7 +59,13 @@ function App() {
     } catch (err) {
       console.error('Analysis error:', err);
       
-      if (err.response?.status === 404) {
+      // Check for Spotify timeout error
+      if (err.response?.data?.error === 'SPOTIFY_TIMEOUT') {
+        setSpotifyTimeout(err.response.data);
+        setError(err.response.data.message);
+      } else if (err.response?.data?.error === 'PROCESSING') {
+        setError('Another playlist is currently being analyzed. Please try again in a moment.');
+      } else if (err.response?.status === 404) {
         setError('Playlist not found. Make sure the playlist is public.');
       } else if (err.response?.status === 429) {
         setError('Too many requests. Please wait a moment and try again.');
@@ -66,6 +88,22 @@ function App() {
         </div>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>Public Playlist Analyzer</p>
       </header>
+
+      {spotifyTimeout && (
+        <div className="timeout-banner">
+          <div className="timeout-icon">⏰</div>
+          <div className="timeout-content">
+            <h3>Spotify Timeout</h3>
+            <p>
+              Spotify has put us in timeout due to high traffic. 
+              We'll be back in approximately <strong>{spotifyTimeout.hoursRemaining} hour{spotifyTimeout.hoursRemaining !== 1 ? 's' : ''}</strong>.
+            </p>
+            <p style={{fontSize: '0.85rem', opacity: 0.8, marginTop: '0.5rem'}}>
+              Sorry for the inconvenience! This happens when too many people use the app at once.
+            </p>
+          </div>
+        </div>
+      )}
 
       {error && <div className="error">{error}</div>}
 
