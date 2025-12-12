@@ -164,6 +164,50 @@ async function getSpotifyToken() {
   }
 }
 
+// User token for playlist access (Owen's account)
+let userAccessToken = null;
+let userTokenExpiry = null;
+const USER_REFRESH_TOKEN = process.env.SPOTIFY_REFRESH_TOKEN;
+
+// Get User Access Token (for playlist access using Owen's account)
+async function getUserAccessToken() {
+  // If token is still valid, return it
+  if (userAccessToken && userTokenExpiry && Date.now() < userTokenExpiry) {
+    return userAccessToken;
+  }
+
+  if (!USER_REFRESH_TOKEN) {
+    throw new Error('SPOTIFY_REFRESH_TOKEN not configured. Please set up Owen\'s refresh token.');
+  }
+
+  console.log('🔄 Refreshing user access token...');
+
+  try {
+    const response = await axios.post(
+      'https://accounts.spotify.com/api/token',
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: USER_REFRESH_TOKEN
+      }),
+      {
+        headers: {
+          'Authorization': `Basic ${getAuthToken()}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+
+    userAccessToken = response.data.access_token;
+    userTokenExpiry = Date.now() + (response.data.expires_in * 1000);
+    
+    console.log('✅ User access token refreshed successfully');
+    return userAccessToken;
+  } catch (error) {
+    console.error('❌ Error refreshing user token:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
 // Spotify Authorization endpoint
 app.get('/login', (req, res) => {
   const scopes = 'playlist-read-private playlist-read-collaborative';
@@ -174,6 +218,19 @@ app.get('/login', (req, res) => {
     `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
   
   res.json({ authUrl });
+});
+
+// ONE-TIME SETUP: Get Owen's refresh token
+app.get('/setup-token', (req, res) => {
+  const scopes = 'playlist-read-private playlist-read-collaborative';
+  const authUrl = `https://accounts.spotify.com/authorize?` +
+    `response_type=code&` +
+    `client_id=${CLIENT_ID}&` +
+    `scope=${encodeURIComponent(scopes)}&` +
+    `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
+    `show_dialog=true`;
+  
+  res.redirect(authUrl);
 });
 
 // Spotify Callback endpoint
@@ -201,6 +258,70 @@ app.get('/callback', async (req, res) => {
     );
 
     const { access_token, refresh_token, expires_in } = response.data;
+
+    // If refresh token isn't configured yet, show it for setup
+    if (!USER_REFRESH_TOKEN && refresh_token) {
+      return res.send(`
+        <html>
+          <head>
+            <title>Clout Calculator - Setup Complete</title>
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+                max-width: 800px; 
+                margin: 50px auto; 
+                padding: 20px;
+                background: #191414;
+                color: #fff;
+              }
+              .token-box {
+                background: #282828;
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+                border: 2px solid #1db954;
+              }
+              code {
+                background: #000;
+                padding: 10px;
+                display: block;
+                border-radius: 5px;
+                word-break: break-all;
+                color: #1db954;
+                font-size: 14px;
+              }
+              .success {
+                color: #1db954;
+                font-size: 28px;
+                font-weight: bold;
+                margin-bottom: 10px;
+              }
+              ol {
+                line-height: 1.8;
+              }
+            </style>
+          </head>
+          <body>
+            <h1 class="success">✅ Setup Complete!</h1>
+            <p>Copy this refresh token and add it to Railway:</p>
+            <div class="token-box">
+              <code>${refresh_token}</code>
+            </div>
+            <h3>Next Steps:</h3>
+            <ol>
+              <li>Copy the token above (click to select all)</li>
+              <li>Go to Railway → Your App → Variables tab</li>
+              <li>Click "New Variable"</li>
+              <li>Name: <code>SPOTIFY_REFRESH_TOKEN</code></li>
+              <li>Value: Paste the token</li>
+              <li>Click "Add" and Railway will auto-redeploy</li>
+            </ol>
+            <p style="color: #ff6b6b;"><strong>⚠️ Keep this token secret!</strong> Anyone with it can access playlists as you.</p>
+            <p style="margin-top: 40px; color: #888;">Once added to Railway, your app will work for everyone forever! 🎉</p>
+          </body>
+        </html>
+      `);
+    }
 
     // In production, redirect to root with token
     // In development, return JSON
@@ -428,18 +549,16 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
   }
 
   try {
-    // Use client credentials - should work for public playlists
-    const token = await getSpotifyToken();
-    console.log('Got Spotify token:', token ? 'Token received (length: ' + token.length + ')' : 'NO TOKEN');
-    console.log('Fetching playlist:', playlistId);
+    // Use Owen's user token for playlist access (playlists require user auth)
+    const userToken = await getUserAccessToken();
+    console.log('Got user token for playlist access');
     
-    // Try accessing playlist with client credentials
-    // Some playlists work, some don't - depends on privacy settings
+    // Get playlist info
     const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}`;
     
     const playlistResponse = await axios.get(playlistUrl, {
       headers: {
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${userToken}`
       }
     }).catch(err => {
       console.error('Spotify API Error Details:', {
@@ -449,7 +568,7 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
         headers: err.response?.headers
       });
       
-      // If 404, playlist might be private or require user auth
+      // If 404, playlist might be private or not exist
       if (err.response?.status === 404) {
         throw new Error('PRIVATE_PLAYLIST');
       }
@@ -460,14 +579,14 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
 
     const playlistName = playlistResponse.data.name;
     
-    // Get all tracks with pagination
+    // Get all tracks with pagination (using user token)
     let allTracks = [];
     let url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
 
     while (url) {
       const tracksResponse = await axios.get(url, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${userToken}`
         }
       });
 
@@ -476,6 +595,9 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
     }
 
     console.log(`Found ${allTracks.length} tracks, analyzing...`);
+    
+    // For artist data, use client credentials (more rate limit headroom)
+    const clientToken = await getSpotifyToken();
     
     // Calculate clout for each track
     const scraper = require('./artistToolsScraper');
@@ -487,8 +609,8 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
       const artist = track.track.artists[0];
       const addedAt = new Date(track.added_at);
 
-      // Get current artist data with caching and retry logic
-      const artistData = await getCachedArtist(artist.id, token);
+      // Get current artist data with caching and retry logic (using client credentials)
+      const artistData = await getCachedArtist(artist.id, clientToken);
 
       const currentFollowers = artistData.followers.total;
       const popularity = artistData.popularity;
