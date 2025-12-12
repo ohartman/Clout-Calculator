@@ -306,6 +306,116 @@ app.post('/api/calculate-clout', async (req, res) => {
   }
 });
 
+// New endpoint: Analyze public playlist without user auth
+app.post('/api/analyze-public-playlist', async (req, res) => {
+  const { playlistId } = req.body;
+
+  if (!playlistId) {
+    return res.status(400).json({ error: 'Playlist ID is required' });
+  }
+
+  try {
+    // Use server's Spotify token (client credentials)
+    const token = await getSpotifyToken();
+    
+    // Get playlist info
+    const playlistResponse = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const playlistName = playlistResponse.data.name;
+    
+    // Get all tracks with pagination
+    let allTracks = [];
+    let url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
+
+    while (url) {
+      const tracksResponse = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      allTracks = allTracks.concat(tracksResponse.data.items);
+      url = tracksResponse.data.next;
+    }
+
+    // Calculate clout for each track
+    const scraper = require('./artistToolsScraper');
+    const cloutData = [];
+
+    for (const track of allTracks) {
+      if (!track.track || !track.track.artists) continue;
+
+      const artist = track.track.artists[0];
+      const addedAt = new Date(track.added_at);
+
+      // Get current artist data
+      const artistResponse = await axios.get(`https://api.spotify.com/v1/artists/${artist.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const currentFollowers = artistResponse.data.followers.total;
+      const popularity = artistResponse.data.popularity;
+
+      // Estimate listeners when track was added
+      const estimatedListenersWhenAdded = scraper.estimateListenersAtDate(currentFollowers, addedAt);
+      
+      // Calculate inflation-adjusted clout score
+      const cloutMetrics = scraper.calculateCloutScore(
+        estimatedListenersWhenAdded,
+        currentFollowers,
+        addedAt
+      );
+
+      cloutData.push({
+        trackName: track.track.name || 'Unknown',
+        artistName: artist.name || 'Unknown',
+        artistId: artist.id,
+        addedAt: track.added_at,
+        addedAgo: Math.floor((Date.now() - addedAt) / (1000 * 60 * 60 * 24 / 30)) + ' months ago',
+        currentFollowers,
+        followersWhenAdded: estimatedListenersWhenAdded,
+        popularity,
+        rawGrowth: Math.round(cloutMetrics.rawGrowth),
+        inflationAdjustedGrowth: cloutMetrics.inflationAdjustedGrowth,
+        discoveryTier: cloutMetrics.discoveryTier,
+        earlyDiscoveryBonus: cloutMetrics.earlyDiscoveryMultiplier,
+        cloutScore: cloutMetrics.score
+      });
+    }
+
+    // Calculate totals
+    const totalClout = cloutData.reduce((sum, item) => sum + item.cloutScore, 0);
+    const averageClout = totalClout / cloutData.length;
+
+    // Sort by clout score
+    cloutData.sort((a, b) => b.cloutScore - a.cloutScore);
+
+    res.json({
+      playlistId,
+      playlistName,
+      totalClout: Math.round(totalClout),
+      averageClout: Math.round(averageClout),
+      trackCount: cloutData.length,
+      tracks: cloutData,
+      note: 'Scores are inflation-adjusted to account for Spotify platform growth'
+    });
+  } catch (error) {
+    console.error('Error analyzing playlist:', error.response?.data || error.message);
+    
+    if (error.response?.status === 404) {
+      return res.status(404).json({ error: 'Playlist not found or is private' });
+    }
+    
+    res.status(500).json({ error: 'Failed to analyze playlist' });
+  }
+});
+
 // Serve React app for all other routes in production
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, 'client/dist/index.html');
