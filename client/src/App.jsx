@@ -10,6 +10,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [spotifyTimeout, setSpotifyTimeout] = useState(null);
+  const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
 
   // Check timeout status on mount
   useEffect(() => {
@@ -39,6 +40,7 @@ function App() {
     setLoading(true);
     setError(null);
     setCloutResults(null);
+    setProgress({ current: 0, total: 100, message: 'Starting analysis...' });
     
     const playlistId = extractPlaylistId(playlistUrl);
     
@@ -49,10 +51,29 @@ function App() {
     }
 
     try {
+      // Simulate progress with intervals
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev.current >= 90) return prev; // Cap at 90% until done
+          const increment = Math.random() * 15 + 5; // Random increment 5-20%
+          const newCurrent = Math.min(prev.current + increment, 90);
+          
+          let message = 'Starting analysis...';
+          if (newCurrent > 10) message = 'Fetching playlist tracks...';
+          if (newCurrent > 30) message = 'Analyzing artist growth...';
+          if (newCurrent > 60) message = 'Calculating clout scores...';
+          
+          return { ...prev, current: newCurrent, message };
+        });
+      }, 800);
+
       // Fetch playlist info and calculate clout
       const response = await axios.post('/api/analyze-public-playlist', {
         playlistId
       });
+
+      clearInterval(progressInterval);
+      setProgress({ current: 100, total: 100, message: 'Complete!' });
 
       setCloutResults(response.data);
       setSelectedPlaylist({ name: response.data.playlistName });
@@ -74,6 +95,7 @@ function App() {
       }
     } finally {
       setLoading(false);
+      setProgress({ current: 0, total: 0, message: '' });
     }
   };
 
@@ -147,8 +169,16 @@ function App() {
 
       {loading && cloutResults === null && (
         <div className="loading">
-          <div className="spinner"></div>
-          <p>Calculating clout score...</p>
+          <div className="progress-container">
+            <div className="progress-message">{progress.message}</div>
+            <div className="progress-bar-wrapper">
+              <div 
+                className="progress-bar-fill" 
+                style={{ width: `${progress.current}%` }}
+              />
+            </div>
+            <div className="progress-percentage">{Math.round(progress.current)}%</div>
+          </div>
         </div>
       )}
 
