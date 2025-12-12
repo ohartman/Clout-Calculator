@@ -58,7 +58,12 @@ function App() {
   return (
     <div className="app">
       <header>
-        <h1>🎵 Clout Calculator</h1>
+        <div>
+          <h1>🎵 Clout Calculator</h1>
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+            Designed by Owen Hartman
+          </p>
+        </div>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>Public Playlist Analyzer</p>
       </header>
 
@@ -83,14 +88,8 @@ function App() {
             </button>
           </form>
 
-          <div className="examples">
-            <p>Example playlists to try:</p>
-            <button 
-              className="example-btn"
-              onClick={() => setPlaylistUrl('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M')}
-            >
-              Today's Top Hits
-            </button>
+          <div className="notice" style={{marginTop: '1.5rem'}}>
+            ⚠️ <strong>User-Generated Playlists Only:</strong> This app only works with playlists created by users. Spotify's editorial playlists (Today's Top Hits, RapCaviar, etc.) are not accessible via the API.
           </div>
         </div>
       )}
