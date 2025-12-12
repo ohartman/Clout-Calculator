@@ -75,14 +75,27 @@ function App() {
           <p className="subtitle">Paste a Spotify playlist URL to see the clout score</p>
           
           <form onSubmit={analyzePlaylist} className="url-form">
-            <input
-              type="text"
-              value={playlistUrl}
-              onChange={(e) => setPlaylistUrl(e.target.value)}
-              placeholder="https://open.spotify.com/playlist/..."
-              className="url-input"
-              disabled={loading}
-            />
+            <div className="input-wrapper">
+              <input
+                type="text"
+                value={playlistUrl}
+                onChange={(e) => setPlaylistUrl(e.target.value)}
+                placeholder="https://open.spotify.com/playlist/..."
+                className="url-input"
+                disabled={loading}
+              />
+              {playlistUrl && (
+                <button
+                  type="button"
+                  onClick={() => setPlaylistUrl('')}
+                  className="clear-btn"
+                  disabled={loading}
+                  aria-label="Clear"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             <button type="submit" className="analyze-btn" disabled={loading}>
               Calculate Clout
             </button>
