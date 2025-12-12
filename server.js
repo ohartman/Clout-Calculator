@@ -317,15 +317,24 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
   }
 
   try {
-    // Use server's Spotify token (client credentials)
+    // Use client credentials - should work for public playlists
     const token = await getSpotifyToken();
     console.log('Got Spotify token, fetching playlist...');
     
-    // Get playlist info
-    const playlistResponse = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+    // Try accessing playlist with client credentials
+    // Some playlists work, some don't - depends on privacy settings
+    const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}`;
+    
+    const playlistResponse = await axios.get(playlistUrl, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
+    }).catch(err => {
+      // If 404, playlist might be private or require user auth
+      if (err.response?.status === 404) {
+        throw new Error('PRIVATE_PLAYLIST');
+      }
+      throw err;
     });
 
     console.log('Playlist found:', playlistResponse.data.name);
@@ -347,6 +356,8 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
       url = tracksResponse.data.next;
     }
 
+    console.log(`Found ${allTracks.length} tracks, analyzing...`);
+    
     // Calculate clout for each track
     const scraper = require('./artistToolsScraper');
     const cloutData = [];
@@ -360,7 +371,7 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
       // Get current artist data
       const artistResponse = await axios.get(`https://api.spotify.com/v1/artists/${artist.id}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${clientToken}`
         }
       });
 
@@ -413,10 +424,20 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
       note: 'Scores are inflation-adjusted to account for Spotify platform growth'
     });
   } catch (error) {
-    console.error('Error analyzing playlist:', error.response?.data || error.message);
+    console.error('Error analyzing playlist:', error.message);
+    
+    if (error.message === 'PRIVATE_PLAYLIST') {
+      return res.status(404).json({ 
+        error: 'This playlist is private or requires authentication. Please make sure the playlist is public.' 
+      });
+    }
     
     if (error.response?.status === 404) {
       return res.status(404).json({ error: 'Playlist not found or is private' });
+    }
+    
+    if (error.response?.status === 401) {
+      return res.status(500).json({ error: 'Authentication error. Please try again.' });
     }
     
     res.status(500).json({ error: 'Failed to analyze playlist' });
