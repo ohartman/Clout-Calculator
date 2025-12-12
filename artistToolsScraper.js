@@ -218,16 +218,29 @@ class ArtistToolsScraper {
       tierColor = '#BDC3C7';
     }
     
-    // Base score is inflation-adjusted growth percentage
-    const baseScore = Math.max(0, inflationAdjustedGrowth);
+    // Calculate absolute growth (raw number of new followers)
+    const absoluteGrowth = currentListeners - listenerAtAdd;
     
-    // Apply multiplier
+    // Volume weight: rewards artists who gained large absolute numbers
+    // Uses logarithmic scale so it doesn't completely dominate
+    const volumeWeight = Math.log10(Math.max(absoluteGrowth, 1) + 1);
+    
+    // Percentage-based score (inflation-adjusted)
+    const percentageScore = Math.max(0, inflationAdjustedGrowth);
+    
+    // Combined score: percentage growth × early discovery multiplier × volume weight
+    // This way, 300K→600K (100% growth, 300K absolute) beats 3K→6K (100% growth, 3K absolute)
+    const baseScore = percentageScore * volumeWeight;
+    
+    // Apply early discovery multiplier
     const finalScore = baseScore * earlyDiscoveryMultiplier;
     
     return {
       score: Math.round(finalScore),
       inflationAdjustedGrowth: Math.round(inflationAdjustedGrowth),
       rawGrowth: this.calculateGrowth(currentListeners, listenerAtAdd),
+      absoluteGrowth: absoluteGrowth,
+      volumeWeight: Math.round(volumeWeight * 100) / 100,
       earlyDiscoveryMultiplier,
       discoveryTier,
       tierEmoji,
