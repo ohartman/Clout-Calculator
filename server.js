@@ -233,6 +233,29 @@ app.get('/setup-token', (req, res) => {
   res.redirect(authUrl);
 });
 
+// DEBUG: Check what the token can access
+app.get('/debug-token', async (req, res) => {
+  try {
+    const token = await getUserAccessToken();
+    
+    // Try to get user's profile
+    const profileResponse = await axios.get('https://api.spotify.com/v1/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    res.json({
+      message: 'Token is valid',
+      user: profileResponse.data.display_name || profileResponse.data.id,
+      scopes_note: 'If this works but playlists dont, the token lacks playlist scopes'
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Token error',
+      details: error.response?.data || error.message
+    });
+  }
+});
+
 // Spotify Callback endpoint
 app.get('/callback', async (req, res) => {
   const code = req.query.code;
