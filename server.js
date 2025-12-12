@@ -575,9 +575,12 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
     // Use Owen's user token for playlist access (playlists require user auth)
     const userToken = await getUserAccessToken();
     console.log('Got user token for playlist access');
+    console.log('Token preview:', userToken.substring(0, 20) + '...');
+    console.log('Token length:', userToken.length);
     
     // Get playlist info
     const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}`;
+    console.log('Requesting:', playlistUrl);
     
     const playlistResponse = await axios.get(playlistUrl, {
       headers: {
@@ -588,7 +591,8 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
         status: err.response?.status,
         statusText: err.response?.statusText,
         data: err.response?.data,
-        headers: err.response?.headers
+        url: playlistUrl,
+        authHeaderPresent: !!err.config?.headers?.Authorization
       });
       
       // If 404, playlist might be private or not exist
@@ -598,7 +602,7 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
       throw err;
     });
 
-    console.log('Playlist found:', playlistResponse.data.name);
+    console.log('✅ Playlist found:', playlistResponse.data.name);
 
     const playlistName = playlistResponse.data.name;
     
