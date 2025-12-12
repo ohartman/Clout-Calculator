@@ -248,8 +248,9 @@ class ArtistToolsScraper {
     
     // OPTION 3: Relevance factor based on final artist size
     // Only artists who became relevant contribute meaningfully
-    // Scale: 10M followers = 1.0, 1M = 0.86, 100K = 0.71, 10K = 0.57
-    const relevanceFactor = Math.min(Math.log10(Math.max(currentListeners, 1)) / 7, 1);
+    // Adjusted to be less harsh - artists at 10K get 0.7 instead of 0.57
+    // Scale: 10M followers = 1.0, 1M = 0.9, 100K = 0.8, 10K = 0.7
+    const relevanceFactor = Math.min((Math.log10(Math.max(currentListeners, 1)) + 3) / 10, 1);
     
     // Apply relevance multiplier
     const finalScore = baseScore * relevanceFactor;
