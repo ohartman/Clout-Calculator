@@ -80,8 +80,8 @@ function App() {
     } catch (err) {
       console.error('Analysis error:', err);
       
-      // Check for Spotify timeout error
-      if (err.response?.data?.error === 'SPOTIFY_TIMEOUT') {
+      // Check for Spotify timeout error (503 status or SPOTIFY_TIMEOUT error)
+      if (err.response?.status === 503 || err.response?.data?.error === 'SPOTIFY_TIMEOUT') {
         setSpotifyTimeout(err.response.data);
         setError(err.response.data.message);
       } else if (err.response?.data?.error === 'PROCESSING') {
