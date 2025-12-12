@@ -31,12 +31,6 @@ const processingQueue = [];
 let spotifyInTimeout = false;
 let timeoutUntil = null;
 
-// TESTING: Manually activate timeout since we're currently rate limited
-// Remove this after Spotify timeout expires
-spotifyInTimeout = true;
-timeoutUntil = Date.now() + (18 * 60 * 60 * 1000); // 18 hours from now
-console.log('⚠️  TESTING MODE: Timeout banner activated');
-
 // Check if Spotify has us in timeout
 function isSpotifyInTimeout() {
   if (!spotifyInTimeout) return false;
