@@ -243,10 +243,17 @@ app.get('/debug-token', async (req, res) => {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     
+    // Try to get user's playlists
+    const playlistsResponse = await axios.get('https://api.spotify.com/v1/me/playlists?limit=5', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
     res.json({
       message: 'Token is valid',
       user: profileResponse.data.display_name || profileResponse.data.id,
-      scopes_note: 'If this works but playlists dont, the token lacks playlist scopes'
+      playlistCount: playlistsResponse.data.items.length,
+      firstPlaylist: playlistsResponse.data.items[0]?.name || 'No playlists',
+      firstPlaylistId: playlistsResponse.data.items[0]?.id || null
     });
   } catch (error) {
     res.status(500).json({
