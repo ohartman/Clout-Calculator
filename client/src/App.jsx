@@ -112,16 +112,19 @@ function App() {
             <h2>{selectedPlaylist?.name}</h2>
             <div className="score-container">
               <div className="score-card">
-                <h3>Total Clout Score</h3>
-                <div className="score-value">{cloutResults.totalClout?.toFixed(0) || 0}</div>
+                <h3>🏆 Normalized Clout</h3>
+                <div className="score-value">{cloutResults.normalizedScore?.toFixed(0) || 0}</div>
+                <p style={{fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', marginTop: '0.5rem'}}>
+                  Size-adjusted score
+                </p>
               </div>
               <div className="score-card">
-                <h3>Average Clout</h3>
-                <div className="score-value">{cloutResults.averageClout?.toFixed(1) || 0}</div>
+                <h3>Average Per Track</h3>
+                <div className="score-value" style={{fontSize: '2rem'}}>{cloutResults.averageClout?.toFixed(1) || 0}</div>
               </div>
               <div className="score-card">
                 <h3>Tracks Analyzed</h3>
-                <div className="score-value">{cloutResults.trackCount || 0}</div>
+                <div className="score-value" style={{fontSize: '2rem'}}>{cloutResults.trackCount || 0}</div>
               </div>
             </div>
           </div>
@@ -129,7 +132,7 @@ function App() {
           <div className="tracks-list">
             <h3>Track Breakdown</h3>
             <div className="notice">
-              ✨ Scores are inflation-adjusted to account for Spotify's platform growth (~17% annually)
+              ✨ Normalized score = Average × √(tracks). Artists who decline in popularity will give you NEGATIVE scores - your bad picks will hurt you! All scores are inflation-adjusted to account for Spotify's ~17% annual growth.
             </div>
             <div className="scroll-hint">
               👉 Swipe left to see all columns →
@@ -171,7 +174,9 @@ function App() {
                     <td className={track.inflationAdjustedGrowth > 0 ? 'positive-growth' : 'negative-growth'}>
                       {track.inflationAdjustedGrowth > 0 ? '+' : ''}{track.inflationAdjustedGrowth || 0}%
                     </td>
-                    <td className="clout-score">{track.cloutScore || 0}</td>
+                    <td className={track.cloutScore >= 0 ? 'clout-score positive-clout' : 'clout-score negative-clout'}>
+                      {track.cloutScore >= 0 ? '+' : ''}{track.cloutScore || 0}
+                    </td>
                   </tr>
                 ))}
               </tbody>

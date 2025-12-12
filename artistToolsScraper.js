@@ -223,13 +223,15 @@ class ArtistToolsScraper {
     
     // Volume weight: rewards artists who gained large absolute numbers
     // Uses logarithmic scale so it doesn't completely dominate
-    const volumeWeight = Math.log10(Math.max(absoluteGrowth, 1) + 1);
+    // For negative growth, use the absolute value for weight calculation
+    const volumeWeight = Math.log10(Math.abs(absoluteGrowth) + 1);
     
     // Percentage-based score (inflation-adjusted)
-    const percentageScore = Math.max(0, inflationAdjustedGrowth);
+    // NO FLOOR - negative growth results in negative scores
+    const percentageScore = inflationAdjustedGrowth;
     
     // Combined score: percentage growth × early discovery multiplier × volume weight
-    // This way, 300K→600K (100% growth, 300K absolute) beats 3K→6K (100% growth, 3K absolute)
+    // Negative growth will result in negative scores (bad picks hurt you!)
     const baseScore = percentageScore * volumeWeight;
     
     // Apply early discovery multiplier

@@ -513,8 +513,17 @@ tbody tr:hover {
 
 .clout-score {
   font-weight: 700;
-  color: #1db954;
   font-size: 1.1rem;
+}
+
+.positive-clout {
+  color: #1db954;
+  text-shadow: 0 0 10px rgba(29, 185, 84, 0.3);
+}
+
+.negative-clout {
+  color: #e74c3c;
+  text-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
 }
 
 .discovery-tier {

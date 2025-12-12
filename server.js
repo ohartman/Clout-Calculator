@@ -12,6 +12,108 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// ========== RATE LIMITING & CACHING ==========
+
+// In-memory caches
+const artistCache = new Map(); // Cache artist data for 1 hour
+const ARTIST_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+// Rate limiting: Track requests per IP
+const requestCounts = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_MINUTE = 10; // Max 10 playlist analyses per minute per IP
+
+// Helper function to check rate limit
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const userRequests = requestCounts.get(ip) || [];
+  
+  // Filter out requests older than the window
+  const recentRequests = userRequests.filter(time => now - time < RATE_LIMIT_WINDOW);
+  
+  if (recentRequests.length >= MAX_REQUESTS_PER_MINUTE) {
+    return false; // Rate limited
+  }
+  
+  // Add current request
+  recentRequests.push(now);
+  requestCounts.set(ip, recentRequests);
+  
+  return true; // Allowed
+}
+
+// Helper function to get user IP
+function getUserIP(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0] || 
+         req.headers['x-real-ip'] || 
+         req.connection.remoteAddress;
+}
+
+// Helper function to get cached artist or fetch with retry logic
+async function getCachedArtist(artistId, token) {
+  const cached = artistCache.get(artistId);
+  
+  if (cached && Date.now() - cached.timestamp < ARTIST_CACHE_TTL) {
+    console.log(`✓ Cache hit for artist ${artistId}`);
+    return cached.data;
+  }
+  
+  // Fetch from Spotify with exponential backoff
+  let retries = 0;
+  const maxRetries = 3;
+  
+  while (retries < maxRetries) {
+    try {
+      // Add delay between requests to avoid rate limits (50ms)
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      const response = await axios.get(`https://api.spotify.com/v1/artists/${artistId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Cache the result
+      artistCache.set(artistId, {
+        data: response.data,
+        timestamp: Date.now()
+      });
+      
+      console.log(`✓ Fetched and cached artist ${artistId}`);
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 429) {
+        // Rate limited - wait and retry
+        const retryAfter = parseInt(error.response.headers['retry-after'] || '2') * 1000;
+        console.log(`⚠️  Rate limited, waiting ${retryAfter}ms before retry ${retries + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, retryAfter));
+        retries++;
+      } else {
+        throw error;
+      }
+    }
+  }
+  
+  throw new Error('Max retries exceeded for artist fetch');
+}
+
+// Clean up old rate limit data every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, requests] of requestCounts.entries()) {
+    const recentRequests = requests.filter(time => now - time < RATE_LIMIT_WINDOW);
+    if (recentRequests.length === 0) {
+      requestCounts.delete(ip);
+    } else {
+      requestCounts.set(ip, recentRequests);
+    }
+  }
+  console.log(`🧹 Cleaned up rate limit cache. Active IPs: ${requestCounts.size}`);
+}, 5 * 60 * 1000);
+
+// ========== END RATE LIMITING & CACHING ==========
+
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -246,15 +348,11 @@ app.post('/api/calculate-clout', async (req, res) => {
       const artist = track.track.artists[0];
       const addedAt = new Date(track.added_at);
 
-      // Get current artist data
-      const artistResponse = await axios.get(`https://api.spotify.com/v1/artists/${artist.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // Get current artist data with caching
+      const artistData = await getCachedArtist(artist.id, token);
 
-      const currentFollowers = artistResponse.data.followers.total;
-      const popularity = artistResponse.data.popularity;
+      const currentFollowers = artistData.followers.total;
+      const popularity = artistData.popularity;
 
       // Estimate what monthly listeners were when track was added
       // Note: Using followers as proxy for monthly listeners
@@ -288,17 +386,21 @@ app.post('/api/calculate-clout', async (req, res) => {
     // Calculate total playlist clout score
     const totalClout = cloutData.reduce((sum, item) => sum + item.cloutScore, 0);
     const averageClout = totalClout / cloutData.length;
+    
+    // Normalized score: average × √(track_count)
+    const normalizedScore = averageClout * Math.sqrt(cloutData.length);
 
     // Sort by clout score (highest first)
     cloutData.sort((a, b) => b.cloutScore - a.cloutScore);
 
     res.json({
       playlistId,
-      totalClout: Math.round(totalClout),
       averageClout: Math.round(averageClout),
+      normalizedScore: Math.round(normalizedScore),
+      totalClout: Math.round(totalClout),
       trackCount: cloutData.length,
       tracks: cloutData,
-      note: 'Scores are inflation-adjusted to account for Spotify platform growth'
+      note: 'Scores are inflation-adjusted. Normalized score accounts for playlist size.'
     });
   } catch (error) {
     console.error('Error calculating clout:', error.response?.data || error.message);
@@ -309,8 +411,17 @@ app.post('/api/calculate-clout', async (req, res) => {
 // New endpoint: Analyze public playlist without user auth
 app.post('/api/analyze-public-playlist', async (req, res) => {
   const { playlistId } = req.body;
+  const userIP = getUserIP(req);
 
-  console.log('Received playlist analysis request for:', playlistId);
+  console.log('Received playlist analysis request for:', playlistId, 'from IP:', userIP);
+
+  // Check rate limit
+  if (!checkRateLimit(userIP)) {
+    console.log(`⛔ Rate limit exceeded for IP: ${userIP}`);
+    return res.status(429).json({ 
+      error: 'Too many requests. Please wait a minute before trying again.' 
+    });
+  }
 
   if (!playlistId) {
     return res.status(400).json({ error: 'Playlist ID is required' });
@@ -376,15 +487,11 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
       const artist = track.track.artists[0];
       const addedAt = new Date(track.added_at);
 
-      // Get current artist data
-      const artistResponse = await axios.get(`https://api.spotify.com/v1/artists/${artist.id}`, {
-        headers: {
-          'Authorization': `Bearer ${clientToken}`
-        }
-      });
+      // Get current artist data with caching and retry logic
+      const artistData = await getCachedArtist(artist.id, token);
 
-      const currentFollowers = artistResponse.data.followers.total;
-      const popularity = artistResponse.data.popularity;
+      const currentFollowers = artistData.followers.total;
+      const popularity = artistData.popularity;
 
       // Estimate listeners when track was added
       const estimatedListenersWhenAdded = scraper.estimateListenersAtDate(currentFollowers, addedAt);
@@ -418,6 +525,11 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
     // Calculate totals
     const totalClout = cloutData.reduce((sum, item) => sum + item.cloutScore, 0);
     const averageClout = totalClout / cloutData.length;
+    
+    // Normalized score: average × √(track_count)
+    // This rewards larger playlists slightly but not linearly
+    // Prevents big playlists from dominating just due to size
+    const normalizedScore = averageClout * Math.sqrt(cloutData.length);
 
     // Sort by clout score
     cloutData.sort((a, b) => b.cloutScore - a.cloutScore);
@@ -425,11 +537,12 @@ app.post('/api/analyze-public-playlist', async (req, res) => {
     res.json({
       playlistId,
       playlistName,
-      totalClout: Math.round(totalClout),
       averageClout: Math.round(averageClout),
+      normalizedScore: Math.round(normalizedScore),
+      totalClout: Math.round(totalClout),
       trackCount: cloutData.length,
       tracks: cloutData,
-      note: 'Scores are inflation-adjusted to account for Spotify platform growth'
+      note: 'Scores are inflation-adjusted. Normalized score accounts for playlist size using √(track_count).'
     });
   } catch (error) {
     console.error('Error analyzing playlist:', error.message);
