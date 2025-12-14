@@ -219,7 +219,7 @@ function App() {
           <div className="tracks-list">
             <h3>Track Breakdown</h3>
             <div className="notice">
-              ✨ Normalized score = Average × √(tracks). Scores are weighted by artist relevance - discovering someone who stays small won't boost your score much, even with high % growth. All scores are inflation-adjusted to account for Spotify's ~17% annual growth.
+              ✨ <strong>How scoring works:</strong> Your score rewards discovering artists early AND who became relevant. Small artists who stay small score low (relevance penalty). Artists who decline give negative scores. Bigger playlists get normalized using √(tracks). All scores are inflation-adjusted for Spotify's ~17% annual growth.
             </div>
             <div className="scroll-hint">
               👉 Swipe left to see all columns →
