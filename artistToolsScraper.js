@@ -127,6 +127,12 @@ class ArtistToolsScraper {
     const now = new Date();
     const monthsAgo = (now - addedDate) / (1000 * 60 * 60 * 24 * 30);
     
+    // Handle edge case: if pastListeners is 0 or very small (< 10)
+    // Use a minimum baseline to avoid division by zero
+    if (pastListeners < 10) {
+      pastListeners = 10;
+    }
+    
     // Spotify platform growth: ~17% per year = 1.3% per month
     const spotifyGrowthRate = 0.013;
     const platformInflation = Math.pow(1 + spotifyGrowthRate, monthsAgo);
